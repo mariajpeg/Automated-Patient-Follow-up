@@ -29,12 +29,32 @@ Automatizar o registro dos atendimentos, calcular a data prevista para acompanha
 
 O acompanhamento é programado para um dia útil após o atendimento. Sábados e domingos são desconsiderados.
 
-**Segurança e limitações**
-
-O projeto utiliza dados fictícios para demonstração. Não realiza diagnóstico, recomendações clínicas ou envio automático de mensagens aos pacientes. O contato permanece sob revisão e responsabilidade humana.
-
 **Resultados**
 
 Foram realizados testes com diferentes datas de atendimento, incluindo casos em dias úteis e na sexta-feira, para verificar o cálculo correto da data de acompanhamento e o funcionamento do fluxo de notificações.
 
 **Status:** MVP funcional em desenvolvimento.
+
+## Limitações e melhorias futuras
+
+Esta primeira versão foi desenvolvida com foco na automação do registro e no envio de lembretes de acompanhamento. Algumas funcionalidades podem ser aprimoradas em versões futuras:
+
+- **Feriados:** implementar um calendário de feriados nacionais para tornar o cálculo de dias úteis mais preciso.
+- **Atualização de status:** automatizar a atualização do status do acompanhamento após o envio do lembrete.
+- **Tratamento de erros:** aprimorar a identificação e o registro de falhas durante a execução do workflow.
+- **Interface:** melhorar a experiência visual do formulário de cadastro.
+
+Essas melhorias fazem parte da evolução planejada do projeto.
+
+## Segurança e privacidade
+
+O projeto foi desenvolvido considerando a importância da proteção de dados pessoais, especialmente por envolver um cenário relacionado à área da saúde.
+
+Algumas medidas e cuidados adotados:
+
+- **Dados fictícios:** as demonstrações do projeto utilizam informações fictícias, sem exposição de dados reais de pacientes.
+- **Envio manual de mensagens:** a automação gera um lembrete por e-mail com uma sugestão de mensagem, mas o contato com o paciente é realizado manualmente, após revisão.
+- **Credenciais:** informações de autenticação e dados privados de integração não devem ser compartilhados no repositório público.
+- **Privacidade:** o projeto não realiza diagnósticos, interpreta sintomas ou recomenda tratamentos.
+
+Por se tratar de um protótipo, sua utilização em um ambiente clínico real exigiria uma avaliação adicional de segurança, controle de acesso e conformidade com a Lei Geral de Proteção de Dados (LGPD).
