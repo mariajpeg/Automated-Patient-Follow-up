@@ -1,0 +1,253 @@
+{
+  "name": "Acompanhamento Pós-Atendimento",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Cadastro de Acompanhamento",
+        "formDescription": "Preencha as informações do atendimento para programar o acompanhamento pós-atendimento.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Nome do paciente",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Data do atendimento",
+              "fieldType": "date",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Observações",
+              "fieldType": "textarea"
+            }
+          ]
+        },
+        "options": {
+          "path": "cadastro-acompanhamento-pos-atendimento",
+          "respondWithOptions": {
+            "values": {
+              "formSubmittedText": "Atendimento registrado! O lembrete será enviado no dia do acompanhamento."
+            }
+          },
+          "useWorkflowTimezone": true
+        }
+      },
+      "id": "59af7727-6f6f-4a3a-a309-515481626444",
+      "name": "Cadastro de Acompanhamento",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "c25dbee6-7596-4de4-bc53-dc5b0d960c97"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "# Valida os dados do formulário e calcula o próximo dia útil.\n\n\ndef ano_bissexto(ano):\n    # Bissexto: divisível por 400, ou divisível por 4 mas não por 100\n    if ano % 400 == 0:\n        return True\n    if ano % 100 == 0:\n        return False\n    return ano % 4 == 0\n\n\ndef dias_no_mes(mes, ano):\n    if mes == 2:\n        if ano_bissexto(ano):\n            return 29\n        return 28\n    if mes in [4, 6, 9, 11]:\n        return 30\n    return 31\n\n\ndef separar_data(texto):\n    # Aceita DD/MM/AAAA ou AAAA-MM-DD (formato do campo de data do formulário)\n    if \"/\" in texto:\n        partes = texto.split(\"/\")\n        if len(partes) != 3:\n            raise ValueError(\"Data inválida. Use DD/MM/AAAA.\")\n        dia, mes, ano = partes\n    elif \"-\" in texto:\n        partes = texto[:10].split(\"-\")\n        if len(partes) != 3:\n            raise ValueError(\"Data inválida. Use DD/MM/AAAA.\")\n        ano, mes, dia = partes\n    else:\n        raise ValueError(\"Data inválida. Use DD/MM/AAAA.\")\n\n    if not (dia.isdigit() and mes.isdigit() and ano.isdigit()):\n        raise ValueError(\"Data inválida. Use DD/MM/AAAA.\")\n\n    dia = int(dia)\n    mes = int(mes)\n    ano = int(ano)\n\n    if mes < 1 or mes > 12:\n        raise ValueError(\"Mês inválido na data informada.\")\n    if dia < 1 or dia > dias_no_mes(mes, ano):\n        raise ValueError(\"Essa data não existe no calendário.\")\n    return dia, mes, ano\n\n\ndef dia_da_semana(dia, mes, ano):\n    # Fórmula de Zeller. Resultado: 0=sábado, 1=domingo, 2=segunda, ... 6=sexta\n    if mes < 3:\n        mes = mes + 12\n        ano = ano - 1\n    k = ano % 100\n    j = ano // 100\n    return (dia + (13 * (mes + 1)) // 5 + k + k // 4 + j // 4 + 5 * j) % 7\n\n\ndef somar_um_dia(dia, mes, ano):\n    dia = dia + 1\n    if dia > dias_no_mes(mes, ano):\n        dia = 1\n        mes = mes + 1\n    if mes > 12:\n        mes = 1\n        ano = ano + 1\n    return dia, mes, ano\n\n\ndef proximo_dia_util(dia, mes, ano):\n    semana = dia_da_semana(dia, mes, ano)\n    dia, mes, ano = somar_um_dia(dia, mes, ano)\n    semana = (semana + 1) % 7\n    # Enquanto cair em sábado (0) ou domingo (1), anda mais um dia\n    while semana == 0 or semana == 1:\n        dia, mes, ano = somar_um_dia(dia, mes, ano)\n        semana = (semana + 1) % 7\n    return dia, mes, ano\n\n\ndef formatar(dia, mes, ano):\n    return f\"{dia:02d}/{mes:02d}/{ano}\"\n\n\nresultado = []\n\nfor item in _items:\n    dados = item[\"json\"]\n    nome = str(dados.get(\"Nome do paciente\") or \"\").strip()\n    data_texto = str(dados.get(\"Data do atendimento\") or \"\").strip()\n    observacoes = str(dados.get(\"Observações\") or \"\").strip()\n\n    if nome == \"\":\n        raise ValueError(\"O nome do paciente é obrigatório.\")\n    if data_texto == \"\":\n        raise ValueError(\"A data do atendimento é obrigatória.\")\n\n    dia, mes, ano = separar_data(data_texto)\n    dia_f, mes_f, ano_f = proximo_dia_util(dia, mes, ano)\n\n    resultado.append({\n        \"json\": {\n            \"nome_paciente\": nome,\n            \"data_atendimento\": formatar(dia, mes, ano),\n            \"data_acompanhamento\": formatar(dia_f, mes_f, ano_f),\n            \"observacoes\": observacoes,\n            \"status\": \"Pendente\",\n            # Wait: 08:00 (Brasília) do dia do acompanhamento\n            \"data_hora_lembrete\": f\"{ano_f:04d}-{mes_f:02d}-{dia_f:02d}T08:00:00-03:00\",\n        }\n    })\n\nreturn resultado\n"
+      },
+      "id": "500ab6dd-348b-4362-b7bd-d903db9e8b11",
+      "name": "Validar e calcular data (Python)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1yPCH5woNL0c9-ckpo_4YCzIB4455kd6boE5fZdq9B9Q",
+          "mode": "list",
+          "cachedResultName": "Planilha sem título",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yPCH5woNL0c9-ckpo_4YCzIB4455kd6boE5fZdq9B9Q/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultName": "acompanhamentos"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Nome do paciente": "={{ $json.nome_paciente }}",
+            "Data do atendimento": "={{ $json.data_atendimento }}",
+            "Data prevista para acompanhamento": "={{ $json.data_acompanhamento }}",
+            "Observações": "={{ $json.observacoes }}",
+            "Status": "={{ $json.status }}"
+          },
+          "schema": [
+            {
+              "id": "Nome do paciente",
+              "displayName": "Nome do paciente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Data do atendimento",
+              "displayName": "Data do atendimento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Data prevista para acompanhamento",
+              "displayName": "Data prevista para acompanhamento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Observações",
+              "displayName": "Observações",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "3ecee7cd-ff09-4158-b79a-55e04b757013",
+      "name": "Registrar na planilha",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "n95KCV7Kp656QiyK",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resume": "specificTime",
+        "dateTime": "={{ $('Validar e calcular data (Python)').item.json.data_hora_lembrete }}"
+      },
+      "id": "c506969c-7860-474d-b6c5-b7654c901f0b",
+      "name": "Aguardar data do acompanhamento",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        0
+      ],
+      "webhookId": "835d55e5-79db-47fc-a1b9-71f608a99097"
+    },
+    {
+      "parameters": {
+        "sendTo": "mariaeduardasb555@gmail.com",
+        "subject": "=Lembrete de acompanhamento: {{ $(\"Validar e calcular data (Python)\").item.json.nome_paciente }}",
+        "emailType": "text",
+        "message": "=Novo acompanhamento pendente!\n\nNome do paciente: {{ $(\"Validar e calcular data (Python)\").item.json.nome_paciente }}\n\nData do atendimento: {{ $(\"Validar e calcular data (Python)\").item.json.data_atendimento }}\n\nData prevista para acompanhamento: {{ $(\"Validar e calcular data (Python)\").item.json.data_acompanhamento }}\n\nObservações: {{ $(\"Validar e calcular data (Python)\").item.json.observacoes }}\n\nStatus: Pendente\n\n---\n\nMENSAGEM SUGERIDA PARA ENVIAR AO PACIENTE:\n\nOlá, {{ $(\"Validar e calcular data (Python)\").item.json.nome_paciente }}! Tudo bem?\n\nEstou entrando em contato para saber como você está após o atendimento realizado em {{ $(\"Validar e calcular data (Python)\").item.json.data_atendimento }}.\n\nGostaríamos de saber se está tudo bem e se você precisa de algum auxílio ou orientação.\n\nEstamos à disposição!\n\n---\n\nLembre-se de revisar a mensagem antes de copiá-la e enviá-la ao paciente.",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "0a8743af-df9e-4fa2-953d-ce9a8bb6254e",
+      "name": "Enviar lembrete para mim",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        896,
+        0
+      ],
+      "webhookId": "6446c758-69ba-4b0d-a83e-93c24c9b0006",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "mQM8WYTCCmKYHwwn",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Cadastro de Acompanhamento": {
+      "main": [
+        [
+          {
+            "node": "Validar e calcular data (Python)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar e calcular data (Python)": {
+      "main": [
+        [
+          {
+            "node": "Registrar na planilha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar na planilha": {
+      "main": [
+        [
+          {
+            "node": "Aguardar data do acompanhamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aguardar data do acompanhamento": {
+      "main": [
+        [
+          {
+            "node": "Enviar lembrete para mim",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timezone": "America/Sao_Paulo"
+  },
+  "versionId": "a8770931-b053-47b5-b60a-207c25efe631",
+  "meta": {
+    "instanceId": "862f159974eabcc1c97424ed0896447e574ff997f0cb9a87eb3fde110e8f6273"
+  },
+  "nodeGroups": [],
+  "id": "qaFIeHTLgdxU1QGS",
+  "tags": []
+}
